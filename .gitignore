@@ -1,0 +1,7 @@
+node_modules
+dist
+bench-results
+*.log
+.bench-profile
+.vercel
+shots
