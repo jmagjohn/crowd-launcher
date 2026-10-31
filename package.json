@@ -11,7 +11,7 @@
     "test": "vitest run",
     "bench:sim": "tsx scripts/bench-sim.ts",
     "bench:browser": "node scripts/bench-browser.mjs",
-    "levels": "tsx scripts/check-levels.ts",
+    "balance": "tsx scripts/balance.ts",
     "shots": "node scripts/shots.mjs"
   },
   "dependencies": {

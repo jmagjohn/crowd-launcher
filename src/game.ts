@@ -15,7 +15,7 @@ import { Screens, type EndSummary } from './ui/screens';
 type Mode = 'menu' | 'play' | 'paused' | 'ended';
 
 export interface GameOptions {
-  levels: LevelConfig[];
+  levels: readonly LevelConfig[];
   /** Benchmark / sandbox level, reachable with ?level=stress or ?bench. */
   stress: LevelConfig;
   /** -1 = continue from the save; otherwise a campaign index; levels.length = the stress level. */

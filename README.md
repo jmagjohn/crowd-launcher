@@ -30,7 +30,7 @@ object name), `?bench` (stress benchmark; add `&warm=3&secs=10`, `&autoq`).
 | `npm run bench:sim` | headless sim at stress load, ms per tick |
 | `npm run build && npm run bench:browser` | production build in Chrome over CDP: desktop 1x and phone 4x CPU throttle, with GPU timer queries. `BENCH_PROFILES=phone-4x-vsync BENCH_RUNS=3` to filter/repeat |
 | `node scripts/profile-browser.mjs` | sampling CPU profile + Chrome per-category metrics at 4x throttle |
-| `npm run levels [-- 3]` | idle / average / skilled bots over all campaign levels (optionally with every upgrade at level N) |
+| `npm run balance [-- from to]` | upgrade-aware winnability check over all 50 levels; `-- --calibrate` re-tunes levels 16-50 |
 | `npm run shots -- <url> <dir> 1,10 5,12` | bot-driven gameplay screenshots in headless Chrome (dev server must be running) |
 | `npx tsx scripts/tris.ts` | triangles / vertices per unit model |
 
@@ -40,7 +40,7 @@ object name), `?bench` (stress benchmark; add `&warm=3&secs=10`, `&autoq`).
 src/sim       pure simulation (no DOM / Three.js): pools, grid, gates, waves, world
 src/render    Three.js scene, instanced units, gates, asset-swap visuals
 src/input     pointer + keyboard
-src/levels    campaign (15 levels) + stress scene
+src/levels    handcrafted 1-15, seeded generator 16-50 + calibration table, stress scene
 src/meta      save schema, coins, upgrades, weapons, dynamic difficulty
 src/ui        HTML HUD and screens
 src/debug     perf overlay, GPU timer, benchmark recorder

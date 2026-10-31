@@ -12,13 +12,13 @@ import {
   EV_SHOCK_HIT,
   EV_SHOCKWAVE,
 } from '../sim/events';
-import { T_BOSS, T_GRUNT, T_SHIELD, T_SWARM } from '../sim/unitTypes';
+import { T_BOSS, T_GRUNT, T_OGRE, T_SHIELD, T_SWARM, T_TYRANT } from '../sim/unitTypes';
 import type { World } from '../sim/world';
 import type { GatesRenderer } from './gatesRenderer';
 import type { Launcher } from './launcher';
 import type { Particles } from './particles';
 
-const ENEMY_COLOR: Record<number, number> = { [T_GRUNT]: 0xe5383b, [T_SHIELD]: 0xf59e0b, [T_SWARM]: 0xff3fa4, [T_BOSS]: 0x8f1a1d };
+const ENEMY_COLOR: Record<number, number> = { [T_GRUNT]: 0xe5383b, [T_SHIELD]: 0xf59e0b, [T_SWARM]: 0xff3fa4, [T_BOSS]: 0x8f1a1d, [T_OGRE]: 0x5f7a2a, [T_TYRANT]: 0x8b2fd6 };
 const GATE_COLOR = [0x22c55e, 0xf97316, 0x2f7bff, 0xdc2626];
 
 // Per-frame emission budgets: a 5,000-unit brawl produces thousands of kill events a second; a sample is plenty.
@@ -156,7 +156,7 @@ export class Effects {
     let w = 0;
     const windStart = SHOCK_PERIOD - SHOCK_WINDUP;
     for (let i = 0; i < E.n && w < MAX_SHOCKS; i++) {
-      if (E.type[i] !== T_BOSS || E.count[i] <= 0) continue;
+      if ((E.type[i] !== T_BOSS && E.type[i] !== T_TYRANT) || E.count[i] <= 0) continue;
       const t = E.aux[i];
       if (t < windStart) continue;
       const k = (t - windStart) / SHOCK_WINDUP;

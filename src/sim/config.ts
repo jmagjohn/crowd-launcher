@@ -39,5 +39,7 @@ export const SHOCK_SPEED = 9;
 export const SHOCK_MAX_R = 7.5;
 export const SHOCK_DMG = 1;
 export const MAX_SHOCKS = 8;
+/** Grunts a Tyrant summons with every stomp (scaled by dynamic difficulty like any crowd). */
+export const TYRANT_SUMMON = 16;
 /** Enemies only steer toward the launcher once they are this close to the breach line. */
 export const DRIFT_RANGE = 30;

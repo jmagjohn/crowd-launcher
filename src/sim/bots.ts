@@ -1,7 +1,7 @@
 import { DT, LANE_HALF, LAUNCH_Y } from './config';
 import { OP_ADD, OP_DIV, OP_MUL, OP_SUB } from './gates';
 import { Rng } from './rng';
-import { T_BOSS, TYPE_SPEED } from './unitTypes';
+import { T_BOSS, T_TYRANT, TYPE_SPEED } from './unitTypes';
 import type { World } from './world';
 
 /** A bot writes `w.input` before each `w.step()`. Bots read sim state only, so runs stay deterministic. */
@@ -82,7 +82,7 @@ export class AimBot implements Bot {
 
 function hasBoss(w: World): boolean {
   const E = w.enemy;
-  for (let i = 0; i < E.n; i++) if (E.type[i] === T_BOSS && E.count[i] > 0) return true;
+  for (let i = 0; i < E.n; i++) if ((E.type[i] === T_BOSS || E.type[i] === T_TYRANT) && E.count[i] > 0) return true;
   return false;
 }
 

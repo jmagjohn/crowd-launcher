@@ -6,12 +6,12 @@
 src/sim/      pure TS, no DOM or Three.js. Runs in the browser and in Node (tests, bots, balance).
 src/render/   Three.js scene, InstancedMesh per unit type, gate panels, camera, asset-swap layer (visuals.ts)
 src/input/    pointer + keyboard -> SimInput (one code path for mouse and touch)
-src/levels/   level configs (data only) + seeded generator (M3)
+src/levels/   level configs (data only), seeded generator 16-50, calibration table
 src/meta/     coins, upgrades, save/load (M2)
 src/ui/       HTML/CSS overlays: HUD, start/win/lose, shop
 src/audio/    procedural WebAudio (M4)
 src/debug/    perf overlay, benchmark harness, lil-gui panel (dev only)
-scripts/      bench-sim (headless), bench-browser (CDP-throttled Chrome), balance (M3)
+scripts/      bench-sim (headless), bench-browser (CDP-throttled Chrome), balance (winnability + calibration)
 ```
 
 ## Data layout
@@ -109,17 +109,26 @@ still ends in a loss (a timer in disguise, but a visible one).
   up in a session, every change logged to the perf overlay.
 - Gate labels and HUD are HTML overlays positioned by projection (few elements, text rewritten only on change).
 
-## Difficulty math (M3)
+## Difficulty math (M3, implemented)
 
 Units of measure: soldier-HP equivalents. Direction (owner feedback after M2): difficulty should climb steeply,
-and upgrades are the intended answer to it. Levels 1-15 stay as they are; the economy stays as it is.
+and upgrades are the intended answer to it. Levels 1-15 and the economy stay as they are.
 
-- Enemy budget: `E(L) = E0 * g^(L-1) * pacing(L)`, the sum of wave HP plus base HP, with `g` set steeper than a
-  skill-only curve: later levels assume the player has been buying upgrades.
-  `pacing`: within each 10-level block a ramp 0.80 -> 1.10 on levels 2..9, the boss level (10, 20, ...) at 1.30,
-  and the level after a boss at 0.70.
-- Expected upgrade state `u(L)` comes from the current coin income and upgrade costs (unchanged). The generator
-  sizes `E(L)` so a well-played run with `u(L)` wins, and a run without upgrades falls behind from the 20s on.
+- Levels 16-50 come from `src/levels/generator.ts`, seeded by level number. Enemy strength is
+  `D(L) = pacing(L) * 1.075^(L-15)` times a per-level calibration `k(L)` (`src/levels/tuning.ts`).
+  `pacing`: within each 10-level block a ramp 0.80 -> 1.10 on levels 2..9, boss levels at 1.30, the level after a
+  boss at 0.70.
+- Random gate layouts move a level's ceiling by up to 4x, so a formula alone cannot hit a target. Calibration
+  (`npm run balance -- --calibrate`), per level:
+  1. Expected upgrades `u(L)`: first-clear coins for levels 1..L-1, spent greedily on the cheapest upgrade, Blaster
+     only, no replays (a conservative player).
+  2. Ceiling: the largest `k` the skilled bot with `u(L)` survives for `levelDuration(L)` (30 s at 16 -> 55 s at
+     50, bosses +10 s) on 3 seeds, by binary search.
+  3. `k(L) = targetMargin(L) * ceiling`, with the margin rising from ~0.5 (16) to 0.82 (40s), same sawtooth.
+  4. Base HP = 90% of the damage that bot deals in `levelDuration(L)`: the threat decides whether you survive, the
+     base decides how long you must.
+  5. Back off `k` 8% at a time until every seed wins the real level.
+- The check (`npm run balance`) fails if any level is not won by the skilled bot with `u(L)` on all seeds.
 - Upgrades: cost `c0 * 1.45^k`, linear gain per level. Replays pay 25%, halving per replay down to 5%.
 - Dynamic difficulty: unchanged (after 3 losses, -5% per step, max -15%, logged).
 
@@ -127,7 +136,7 @@ and upgrades are the intended answer to it. Levels 1-15 stay as they are; the ec
 
 Dropped: player-calibrated bot bands, re-tuning levels 1-15, economy rework, mobile pass (all reported fine).
 
-**M3: levels 16-50 and harder late game**
+**M3: levels 16-50 and harder late game** (done, see docs/milestones/M3.md)
 - Seeded level generator for 16-50 using the budget above: bosses at 20/30/40/50, a breather after each.
 - New pressure as levels climb: mixed waves (shields with swarms), several bosses, faster moving and flip gates,
   more toll and divide gates, tighter gate choices.

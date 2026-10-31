@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { NUM_UNIT_TYPES, T_BOSS, T_BRUTE, T_GRUNT, T_RUNNER, T_SHIELD, T_SOLDIER, T_SWARM } from '../sim/unitTypes';
+import { NUM_UNIT_TYPES, T_BOSS, T_BRUTE, T_GRUNT, T_OGRE, T_RUNNER, T_SHIELD, T_SOLDIER, T_SWARM, T_TYRANT } from '../sim/unitTypes';
 
 /**
  * Asset-swap layer. The sim only knows type ids; everything about how a type looks lives here.
@@ -53,6 +53,11 @@ const GOLD = 0xffcc33;
 const MAGENTA = 0xff3fa4;
 const PURPLE = 0x6d28d9;
 const EYE = 0xfff1a8;
+const OLIVE = 0x8fb83f;
+const OLIVE_D = 0x5d7d26;
+const WOOD = 0x7a4a24;
+const VOID = 0x4a1d63;
+const VIOLET = 0x8b2fd6;
 
 const soldier: Part[] = [
   { shape: { s: 'capsule', r: 0.19, len: 0.22 }, color: BLUE, pos: [0, 0.4, 0] },
@@ -114,6 +119,28 @@ const boss: Part[] = [
   { shape: { s: 'box', w: 2.6, h: 0.3, d: 1.6 }, color: GOLD, pos: [0, 2.9, 0] },
 ];
 
+const ogre: Part[] = [
+  { shape: { s: 'sphere', r: 0.62, detail: 1 }, color: OLIVE, pos: [0, 0.95, 0], scale: [1.1, 1, 0.9] },
+  { shape: { s: 'box', w: 0.7, h: 0.45, d: 0.55 }, color: OLIVE_D, pos: [0, 0.25, 0] },
+  { shape: { s: 'sphere', r: 0.3, detail: 0 }, color: OLIVE_D, pos: [0, 1.65, 0.1] },
+  { shape: { s: 'box', w: 0.32, h: 0.06, d: 0.06 }, color: EYE, pos: [0, 1.7, 0.38] },
+  { shape: { s: 'cyl', rt: 0.16, rb: 0.08, h: 0.95, seg: 5 }, color: WOOD, pos: [0.72, 1.05, 0.25], rot: [0.5, 0, -0.35] },
+  { shape: { s: 'box', w: 1.25, h: 0.14, d: 0.95 }, color: RED_D, pos: [0, 0.62, 0] },
+];
+
+const tyrant: Part[] = [
+  { shape: { s: 'sphere', r: 1.75, detail: 1 }, color: VOID, pos: [0, 2.3, 0], scale: [1.1, 1, 0.9] },
+  { shape: { s: 'box', w: 1.9, h: 1.4, d: 1.4 }, color: DARK, pos: [0, 0.7, 0] },
+  { shape: { s: 'sphere', r: 0.9, detail: 1 }, color: VIOLET, pos: [-1.85, 2.9, 0] },
+  { shape: { s: 'sphere', r: 0.9, detail: 1 }, color: VIOLET, pos: [1.85, 2.9, 0] },
+  { shape: { s: 'cone', r: 0.35, h: 1.1, seg: 5 }, color: STEEL, pos: [-1.95, 3.9, 0], rot: [0, 0, 0.2] },
+  { shape: { s: 'cone', r: 0.35, h: 1.1, seg: 5 }, color: STEEL, pos: [1.95, 3.9, 0], rot: [0, 0, -0.2] },
+  { shape: { s: 'sphere', r: 0.8, detail: 1 }, color: VIOLET, pos: [0, 4.1, 0.3] },
+  { shape: { s: 'cyl', rt: 0.75, rb: 0.6, h: 0.45, seg: 7 }, color: GOLD, pos: [0, 4.95, 0.25] },
+  { shape: { s: 'box', w: 0.62, h: 0.14, d: 0.1 }, color: MAGENTA, pos: [0, 4.15, 1.08] },
+  { shape: { s: 'box', w: 3.1, h: 0.34, d: 1.8 }, color: GOLD, pos: [0, 3.3, 0] },
+];
+
 export const UNIT_VISUALS: readonly VisualDef[] = (() => {
   const v: VisualDef[] = new Array(NUM_UNIT_TYPES);
   v[T_SOLDIER] = { source: { kind: 'parts', parts: soldier }, bob: 0.07, shadow: 0.4, maxInstances: 1e9, scale: 1.3 };
@@ -123,6 +150,8 @@ export const UNIT_VISUALS: readonly VisualDef[] = (() => {
   v[T_SHIELD] = { source: { kind: 'parts', parts: shield }, bob: 0.03, shadow: 0.6, maxInstances: 1e9, scale: 1.2 };
   v[T_SWARM] = { source: { kind: 'parts', parts: swarm }, bob: 0.12, shadow: 0.34, maxInstances: 1e9, scale: 1.3 };
   v[T_BOSS] = { source: { kind: 'parts', parts: boss }, bob: 0.04, shadow: 2.4, maxInstances: 8 };
+  v[T_OGRE] = { source: { kind: 'parts', parts: ogre }, bob: 0.05, shadow: 0.8, maxInstances: 1e9, scale: 1.1 };
+  v[T_TYRANT] = { source: { kind: 'parts', parts: tyrant }, bob: 0.04, shadow: 2.8, maxInstances: 8 };
   return v;
 })();
 

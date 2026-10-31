@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CAMPAIGN } from '../src/levels/campaign';
+import { LEVELS } from '../src/levels';
 import { STRESS_LEVEL } from '../src/levels/stress';
 import { hashWorld } from '../src/sim/hash';
 import type { LevelConfig } from '../src/sim/levelTypes';
@@ -18,7 +18,7 @@ function scriptedRun(level: LevelConfig, seed: number, ticks: number): { hash: s
 }
 
 describe('determinism', () => {
-  for (const level of CAMPAIGN) {
+  for (const level of LEVELS) {
     it(`same seed + inputs => same state (${level.id})`, () => {
       const a = scriptedRun(level, 42, 60 * 40);
       const b = scriptedRun(level, 42, 60 * 40);
@@ -29,8 +29,8 @@ describe('determinism', () => {
   }
 
   it('different seeds diverge', () => {
-    const a = scriptedRun(CAMPAIGN[1], 1, 60 * 20);
-    const b = scriptedRun(CAMPAIGN[1], 2, 60 * 20);
+    const a = scriptedRun(LEVELS[1], 1, 60 * 20);
+    const b = scriptedRun(LEVELS[1], 2, 60 * 20);
     expect(a.hash).not.toBe(b.hash);
   });
 
@@ -41,7 +41,7 @@ describe('determinism', () => {
     expect(a.hash).toBe(b.hash);
   });
 
-  for (const level of [...CAMPAIGN, STRESS_LEVEL]) {
+  for (const level of [...LEVELS, STRESS_LEVEL]) {
     it(`logical units are conserved every tick (${level.id})`, () => {
       const w = new World(level, undefined, 3);
       for (let t = 0; t < 60 * 25 && w.state === 0; t++) {

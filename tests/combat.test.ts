@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SHOCK_PERIOD, TICK_HZ } from '../src/sim/config';
+import { SHOCK_PERIOD, TICK_HZ, TYRANT_SUMMON } from '../src/sim/config';
 import { NEUTRAL_MODS, type LevelConfig } from '../src/sim/levelTypes';
-import { T_BRUTE, T_SOLDIER } from '../src/sim/unitTypes';
+import { T_BRUTE, T_GRUNT, T_SOLDIER } from '../src/sim/unitTypes';
 import { WEAPONS, weaponUnitsPerSecond } from '../src/sim/weapons';
 import { World } from '../src/sim/world';
 
@@ -93,5 +93,31 @@ describe('boss shockwave', () => {
     expect(w.stats.shockKilled).toBeGreaterThan(0);
     expect(w.stats.shockKilled).toBeLessThanOrEqual(before);
     expect(w.player.logicalCount()).toBe(before - w.stats.playerLost - w.stats.unitsToBase);
+  });
+});
+
+describe('tyrant', () => {
+  const lvl: LevelConfig = { ...EMPTY, waves: [{ t: 0, type: 'tyrant', count: 1, x: 0, hp: 1e6 }] };
+
+  it('summons exactly TYRANT_SUMMON grunts in front of itself with every stomp', () => {
+    const w = new World(lvl, NEUTRAL_MODS, 1);
+    w.step();
+    let stomps = 0;
+    for (let t = 0; t < TICK_HZ * SHOCK_PERIOD * 2 + 2; t++) {
+      const before = w.enemyLogical;
+      w.step();
+      if (w.enemyLogical > before) {
+        stomps++;
+        expect(w.enemyLogical - before).toBe(TYRANT_SUMMON);
+        for (let i = 0; i < w.enemy.n; i++) if (w.enemy.type[i] === T_GRUNT) expect(w.enemy.y[i]).toBeLessThan(w.enemy.y[0]);
+      }
+    }
+    expect(stomps).toBe(2);
+  });
+
+  it('summons scale down with dynamic difficulty', () => {
+    const w = new World(lvl, { ...NEUTRAL_MODS, enemyScale: 0.5 }, 1);
+    while (w.enemyLogical <= 1) w.step();
+    expect(w.enemyLogical).toBe(1 + TYRANT_SUMMON / 2);
   });
 });

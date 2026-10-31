@@ -1,7 +1,7 @@
 // Level data shapes. Levels are plain data; the sim compiles them into runtime state at load.
 
 export type GateOpName = 'add' | 'sub' | 'mul' | 'div';
-export type EnemyKey = 'grunt' | 'shield' | 'swarm' | 'boss';
+export type EnemyKey = 'grunt' | 'shield' | 'swarm' | 'boss' | 'ogre' | 'tyrant';
 
 export interface GateConfig {
   op: GateOpName;

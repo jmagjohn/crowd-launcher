@@ -17,6 +17,7 @@ import {
   SHOCK_PERIOD,
   SHOCK_SPEED,
   SHOCK_WINDUP,
+  TYRANT_SUMMON,
   TICK_HZ,
 } from './config';
 import {
@@ -45,6 +46,7 @@ import {
   T_BRUTE,
   T_GRUNT,
   T_SOLDIER,
+  T_TYRANT,
   TYPE_BASE_DMG,
   TYPE_DRIFT,
   TYPE_FLAGS,
@@ -106,6 +108,8 @@ export class World {
   readonly schedule: readonly SpawnEvent[];
 
   readonly fireRate: number = 0;
+  /** Dynamic-difficulty factor in effect (<= 1). */
+  readonly enemyScale: number = 1;
   readonly shotSize: number = 0;
   readonly chargePerUnit: number = 0;
   readonly championEnabled: boolean = true;
@@ -152,6 +156,7 @@ export class World {
     this.grid = new SpatialGrid(cap);
     this.gates = level.gates.map((g) => new Gate(g));
     const scale = Math.min(1, mods.enemyScale);
+    this.enemyScale = scale;
     this.schedule = compileWaves(level, scale);
 
     const weapon = WEAPONS[mods.weapon] ?? WEAPONS[0];
@@ -327,7 +332,7 @@ export class World {
   }
 
   /** Spawns `count` logical enemies as up to MAX_GROUP_ENTITIES stacks in a formation emerging from the base. */
-  spawnGroup(type: number, count: number, x: number, spread: number, hp: number): void {
+  spawnGroup(type: number, count: number, x: number, spread: number, hp: number, y = ENEMY_SPAWN_Y): void {
     if (count <= 0) return;
     const E = this.enemy;
     const rng = this.rng;
@@ -357,7 +362,7 @@ export class World {
       const col = j - row * perRow;
       const rowN = Math.min(perRow, k - row * perRow);
       const ex = x + (col - (rowN - 1) / 2) * spacing + rng.range(-0.08, 0.08);
-      const ey = ENEMY_SPAWN_Y + row * spacing + rng.range(-0.08, 0.08);
+      const ey = y + row * spacing + rng.range(-0.08, 0.08);
       const e = E.alloc(type, rng.bits16());
       E.x[e] = E.px[e] = clamp(ex, -LANE_HALF + r, LANE_HALF - r);
       E.y[e] = E.py[e] = ey;
@@ -526,7 +531,7 @@ export class World {
     for (let i = 0; i < E.n; i++) {
       if (E.count[i] <= 0) continue;
       const t = E.type[i];
-      if (t === T_BOSS && this.bossTick(i)) continue;
+      if ((t === T_BOSS || t === T_TYRANT) && this.bossTick(i)) continue;
       const y = E.y[i] - TYPE_SPEED[t] * DT;
       E.y[i] = y;
       let x = E.x[i];
@@ -560,7 +565,11 @@ export class World {
     const windStart = SHOCK_PERIOD - SHOCK_WINDUP;
     if (after >= SHOCK_PERIOD) {
       E.aux[i] = 0;
-      this.releaseShock(E.x[i], E.y[i]);
+      this.releaseShock(E.x[i], E.y[i], TYPE_RADIUS[E.type[i]]);
+      if (E.type[i] === T_TYRANT) {
+        const r = TYPE_RADIUS[T_TYRANT];
+        this.spawnGroup(T_GRUNT, Math.max(1, Math.round(TYRANT_SUMMON * this.enemyScale)), E.x[i], r * 2, 1, E.y[i] - r - 0.6);
+      }
       return true;
     }
     E.aux[i] = after;
@@ -575,13 +584,13 @@ export class World {
     return after >= windStart;
   }
 
-  private releaseShock(x: number, y: number): void {
+  private releaseShock(x: number, y: number, r0: number): void {
     for (let k = 0; k < MAX_SHOCKS; k++) {
       if (this.shockOn[k] !== 0) continue;
       this.shockOn[k] = 1;
       this.shockX[k] = x;
       this.shockY[k] = y;
-      this.shockR[k] = TYPE_RADIUS[T_BOSS];
+      this.shockR[k] = r0;
       this.events.push(EV_SHOCKWAVE, x, y, k, 0);
       return;
     }

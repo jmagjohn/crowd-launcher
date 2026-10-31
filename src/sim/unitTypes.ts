@@ -7,7 +7,9 @@ export const T_GRUNT = 3;
 export const T_SHIELD = 4;
 export const T_SWARM = 5;
 export const T_BOSS = 6;
-export const NUM_UNIT_TYPES = 7;
+export const T_OGRE = 7;
+export const T_TYRANT = 8;
+export const NUM_UNIT_TYPES = 9;
 
 export const TEAM_PLAYER = 0;
 export const TEAM_ENEMY = 1;
@@ -42,6 +44,10 @@ export const UNIT_DEFS: readonly UnitDef[] = [
   { id: T_SHIELD, key: 'shield', name: 'Shield', team: TEAM_ENEMY, maxHp: 3, speed: 2.5, radius: 0.45, baseDamage: 0, flags: 0, drift: 0.35, weave: 0 },
   { id: T_SWARM, key: 'swarm', name: 'Swarm', team: TEAM_ENEMY, maxHp: 1, speed: 7, radius: 0.2, baseDamage: 0, flags: 0, drift: 0.9, weave: 2.6 },
   { id: T_BOSS, key: 'boss', name: 'Boss', team: TEAM_ENEMY, maxHp: 300, speed: 0.9, radius: 2.2, baseDamage: 0, flags: F_BIG, drift: 0.25, weave: 0 },
+  // Late game (levels 16+). Ogre: a slow, heavy brawler worth 12 grunts that soaks up thin streams.
+  { id: T_OGRE, key: 'ogre', name: 'Ogre', team: TEAM_ENEMY, maxHp: 12, speed: 1.9, radius: 0.7, baseDamage: 0, flags: 0, drift: 0.3, weave: 0 },
+  // Tyrant: boss variant from level 30. Same shockwave cycle as the Warden, and each stomp summons grunts.
+  { id: T_TYRANT, key: 'tyrant', name: 'Tyrant', team: TEAM_ENEMY, maxHp: 900, speed: 0.8, radius: 2.6, baseDamage: 0, flags: F_BIG, drift: 0.2, weave: 0 },
 ];
 
 // Parallel arrays for hot-loop lookups.

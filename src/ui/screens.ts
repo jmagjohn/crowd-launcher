@@ -122,6 +122,7 @@ export class Screens {
     });
     card.append(grid, this.actionRow([{ label: 'Back', run: onBack }]));
     this.root.replaceChildren(card);
+    grid.querySelector('.current')?.scrollIntoView({ block: 'center' });
   }
 
   /** Shop: weapons (buy once, equip) and upgrades (levels). Re-renders in place after every purchase. */
