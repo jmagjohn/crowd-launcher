@@ -109,22 +109,36 @@ still ends in a loss (a timer in disguise, but a visible one).
   up in a session, every change logged to the perf overlay.
 - Gate labels and HUD are HTML overlays positioned by projection (few elements, text rewritten only on change).
 
-## Difficulty math (implemented in M3, sketched here)
+## Difficulty math (M3)
 
-Units of measure: soldier-HP equivalents.
+Units of measure: soldier-HP equivalents. Direction (owner feedback after M2): difficulty should climb steeply,
+and upgrades are the intended answer to it. Levels 1-15 stay as they are; the economy stays as it is.
 
-- Enemy budget: `E(L) = E0 * g^(L-1) * pacing(L)`, the sum of wave HP plus base HP.
-  `pacing`: within each 10-level block a linear ramp 0.80 -> 1.10 on levels 2..9 of the block, the boss level
-  (10, 20, ...) at 1.30, and the level after a boss at 0.70.
-- Player supply: `S(L, tier) = fireRate(u(L)) * T * M(L, tier) * dmg(u(L))` where `u(L)` is the expected upgrade
-  state at level L, `T` the target duration, and `M` the realised gate multiplier (idle ~ centre gates only,
-  average ~ 60-75% of optimal with reaction delay and aim noise, skilled ~ 95%).
-- The generator picks gate values so that `S_skilled ~ 1.3 E`, `S_avg ~ 1.0-1.1 E`, `S_idle < E` from level 5 on,
-  then the headless bots verify with the real sim and the constants get tuned until the table is clean.
-- Upgrades: cost `c0 * 1.45^k`, gain linear per level; with linear-ish coin income, upgrade levels grow roughly
-  logarithmically, so upgrades help without replacing skill. Replays pay 25% and halve per replay down to 5%.
-- Dynamic difficulty: after 3 consecutive losses on a level, the budget drops 5%, up to 3 steps (-15%); never
-  increases; every change goes to the debug log.
+- Enemy budget: `E(L) = E0 * g^(L-1) * pacing(L)`, the sum of wave HP plus base HP, with `g` set steeper than a
+  skill-only curve: later levels assume the player has been buying upgrades.
+  `pacing`: within each 10-level block a ramp 0.80 -> 1.10 on levels 2..9, the boss level (10, 20, ...) at 1.30,
+  and the level after a boss at 0.70.
+- Expected upgrade state `u(L)` comes from the current coin income and upgrade costs (unchanged). The generator
+  sizes `E(L)` so a well-played run with `u(L)` wins, and a run without upgrades falls behind from the 20s on.
+- Upgrades: cost `c0 * 1.45^k`, linear gain per level. Replays pay 25%, halving per replay down to 5%.
+- Dynamic difficulty: unchanged (after 3 losses, -5% per step, max -15%, logged).
+
+## Roadmap (revised after M2 feedback)
+
+Dropped: player-calibrated bot bands, re-tuning levels 1-15, economy rework, mobile pass (all reported fine).
+
+**M3: levels 16-50 and harder late game**
+- Seeded level generator for 16-50 using the budget above: bosses at 20/30/40/50, a breather after each.
+- New pressure as levels climb: mixed waves (shields with swarms), several bosses, faster moving and flip gates,
+  more toll and divide gates, tighter gate choices.
+- Possibly 1-2 new enemy types and a stronger boss variant for 30+, so late levels feel new, not just bigger.
+- Only automated check: a fast sanity test that every generated level is winnable with the expected upgrades
+  and that a seed always produces the same level. No player-simulation bands.
+- Upgrade caps reviewed so 50 stays reachable (max levels may rise if the late curve needs it).
+
+**M4: feel**
+- Procedural WebAudio (fire, gates, hits, boss stomp, win/lose) with a mute toggle.
+- Juice: slow-mo on big moments, win celebration, camera follow, shake tuning.
 
 ## Measurement plan
 
