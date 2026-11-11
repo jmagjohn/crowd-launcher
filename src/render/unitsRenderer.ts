@@ -25,6 +25,7 @@ export class UnitsRenderer {
   private readonly caps = new Int32Array(NUM_UNIT_TYPES);
   private readonly used = new Int32Array(NUM_UNIT_TYPES);
   private readonly ranges: Range[] = [];
+  private readonly phase = new Int32Array(NUM_UNIT_TYPES);
   /** Render-side cap per pool. Lower than the sim cap => draw every k-th entity, scaled up (quality scaling). */
   visualCap = 3000;
   /** The quality ladder can turn blob shadows off. */
@@ -43,7 +44,11 @@ export class UnitsRenderer {
       attr.setUsage(THREE.DynamicDrawUsage);
       geom.setAttribute('aInst', attr);
       const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
-      mat.onBeforeCompile = patchInstanceShader;
+      const walk = { uBob: { value: vis.bob }, uSwing: { value: vis.swing }, uSway: { value: vis.sway } };
+      mat.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, walk);
+        patchInstanceShader(shader);
+      };
       mat.customProgramCacheKey = instanceCacheKey;
       const mesh = new THREE.InstancedMesh(geom, mat, cap);
       mesh.frustumCulled = false;
@@ -106,8 +111,10 @@ export class UnitsRenderer {
     const used = this.used;
     const caps = this.caps;
     const arrays = this.arrays;
-    // Run bob: |sin| at ~4 cycles/s from a table, phase-shifted per entity by its seed.
-    const phase = (time * 4.14 * BOB_STEPS) | 0;
+    // Walk phase per type from a sine table, shifted per entity by its seed. The shader turns it into leg swing,
+    // bob (|sin|, two steps per cycle) and sway.
+    const phase = this.phase;
+    for (let t = 0; t < NUM_UNIT_TYPES; t++) phase[t] = (time * TYPE_STRIDE[t] * WALK_STEPS) | 0;
     let drawn = 0;
     for (let i = 0; i < n; i += stride) {
       const c = count[i];
@@ -123,7 +130,7 @@ export class UnitsRenderer {
       const arr = arrays[t];
       const o = slot * 4;
       arr[o] = px[i] + (x[i] - px[i]) * alpha;
-      arr[o + 1] = TYPE_BOB[t] * BOB_TABLE[(phase + (seed[i] >> 8)) & BOB_MASK];
+      arr[o + 1] = WALK_TABLE[(phase[t] + (seed[i] >> 8)) & WALK_MASK];
       arr[o + 2] = -(py[i] + (y[i] - py[i]) * alpha);
       arr[o + 3] = s;
       drawn++;
@@ -132,14 +139,34 @@ export class UnitsRenderer {
   }
 }
 
+/**
+ * aInst = (x, walk, z, scale), where walk = sin(walk phase) in -1..1. Parts in walk group 1/2 (aAnim.x) swing about
+ * the x axis at hip height aAnim.y in opposite phase; the whole body sways about z and bobs twice per cycle.
+ */
+const INSTANCE_VERT = /* glsl */ `
+float w = aInst.y;
+vec3 p = position;
+if (aAnim.x > 0.5) {
+  float a = w * uSwing * (aAnim.x < 1.5 ? 1.0 : -1.0);
+  float c = cos(a), s = sin(a);
+  float py = p.y - aAnim.y;
+  p = vec3(p.x, aAnim.y + py * c - p.z * s, py * s + p.z * c);
+}
+float sw = w * uSway;
+p = vec3(p.x * cos(sw) - p.y * sin(sw), p.x * sin(sw) + p.y * cos(sw), p.z);
+vec3 transformed = p * aInst.w + vec3(aInst.x, uBob * abs(w), aInst.z);
+`;
+
+const INSTANCE_DECL = 'attribute vec4 aInst;\nattribute vec2 aAnim;\nuniform float uBob;\nuniform float uSwing;\nuniform float uSway;';
+
 function patchInstanceShader(shader: THREE.WebGLProgramParametersWithUniforms): void {
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec4 aInst;')
-    .replace('#include <begin_vertex>', 'vec3 transformed = position * aInst.w + aInst.xyz;');
+    .replace('#include <common>', `#include <common>\n${INSTANCE_DECL}`)
+    .replace('#include <begin_vertex>', INSTANCE_VERT);
 }
 
 function instanceCacheKey(): string {
-  return 'aInst-v1';
+  return 'aInst-walk-v2';
 }
 
 const SHADOW_VERT = /* glsl */ `
@@ -170,7 +197,7 @@ function shadowMaterial(radius: number): THREE.ShaderMaterial {
   });
 }
 
-const BOB_STEPS = 256;
-const BOB_MASK = BOB_STEPS - 1;
-const BOB_TABLE = new Float32Array(BOB_STEPS).map((_, i) => Math.abs(Math.sin((Math.PI * i) / BOB_STEPS)));
-const TYPE_BOB = new Float32Array(UNIT_VISUALS.map((v) => v.bob));
+const WALK_STEPS = 256;
+const WALK_MASK = WALK_STEPS - 1;
+const WALK_TABLE = new Float32Array(WALK_STEPS).map((_, i) => Math.sin((2 * Math.PI * i) / WALK_STEPS));
+const TYPE_STRIDE = new Float32Array(UNIT_VISUALS.map((v) => v.stride));

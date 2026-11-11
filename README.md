@@ -11,7 +11,7 @@ npm install
 npm run dev          # http://localhost:5199
 ```
 
-Controls: hold to fire, drag (or move the mouse) to aim. Keyboard: A/D or arrows aim, Space fires, E launches the
+Controls: hold to fire, drag (or move the mouse) to aim. Keyboard: A/D or arrows aim, Space fires, B (or E) launches the
 Brute when charged, Esc pauses, ` or P toggles the perf overlay.
 
 Game: a 15-level campaign (one new mechanic per level, boss at 10), coins from every run, and a shop with four
@@ -30,7 +30,9 @@ object name), `?bench` (stress benchmark; add `&warm=3&secs=10`, `&autoq`).
 | `npm run bench:sim` | headless sim at stress load, ms per tick |
 | `npm run build && npm run bench:browser` | production build in Chrome over CDP: desktop 1x and phone 4x CPU throttle, with GPU timer queries. `BENCH_PROFILES=phone-4x-vsync BENCH_RUNS=3` to filter/repeat |
 | `node scripts/profile-browser.mjs` | sampling CPU profile + Chrome per-category metrics at 4x throttle |
-| `npm run balance [-- from to]` | upgrade-aware winnability check over all 50 levels; `-- --calibrate` re-tunes levels 16-50 |
+| `npm run balance [-- from to]` | upgrade-aware winnability check over levels 1-100; `-- from to --calibrate` re-tunes that range |
+| `npx tsx scripts/endless-check.ts [from to]` | plays endless levels with the skilled bot and maxed upgrades, to see where the wall lands |
+| `/gallery.html` (dev server) | every unit model side by side; `?type=boss` for one |
 | `npm run shots -- <url> <dir> 1,10 5,12` | bot-driven gameplay screenshots in headless Chrome (dev server must be running) |
 | `npx tsx scripts/tris.ts` | triangles / vertices per unit model |
 
@@ -40,7 +42,7 @@ object name), `?bench` (stress benchmark; add `&warm=3&secs=10`, `&autoq`).
 src/sim       pure simulation (no DOM / Three.js): pools, grid, gates, waves, world
 src/render    Three.js scene, instanced units, gates, asset-swap visuals
 src/input     pointer + keyboard
-src/levels    handcrafted 1-15, seeded generator 16-50 + calibration table, stress scene
+src/levels    handcrafted 1-15, seeded generator 16-100 + calibration table, endless 101+ (calibrated to 160), stress scene
 src/meta      save schema, coins, upgrades, weapons, dynamic difficulty
 src/ui        HTML HUD and screens
 src/debug     perf overlay, GPU timer, benchmark recorder

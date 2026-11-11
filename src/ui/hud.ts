@@ -45,7 +45,7 @@ export class Hud {
         <div class="pill enemy"><span class="dot red"></span><span class="enemy-count">0</span></div>
         <div class="weapon-tag"></div>
         <button class="champ" type="button" aria-label="Launch Brute">
-          <div class="charge-fill"></div><span>BRUTE</span>
+          <div class="charge-fill"></div><span>BRUTE</span><kbd>B</kbd>
         </button>
       </div>`;
     stage.append(this.root);

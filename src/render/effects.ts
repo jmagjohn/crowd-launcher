@@ -18,8 +18,21 @@ import type { GatesRenderer } from './gatesRenderer';
 import type { Launcher } from './launcher';
 import type { Particles } from './particles';
 
-const ENEMY_COLOR: Record<number, number> = { [T_GRUNT]: 0xe5383b, [T_SHIELD]: 0xf59e0b, [T_SWARM]: 0xff3fa4, [T_BOSS]: 0x8f1a1d, [T_OGRE]: 0x5f7a2a, [T_TYRANT]: 0x8b2fd6 };
+const ENEMY_COLOR: Record<number, number> = {
+  [T_GRUNT]: 0x6fb33c,
+  [T_SHIELD]: 0x8a5a2b,
+  [T_SWARM]: 0x9fd34e,
+  [T_BOSS]: 0x4b8a2a,
+  [T_OGRE]: 0x8399ad,
+  [T_TYRANT]: 0x86739f,
+};
 const GATE_COLOR = [0x22c55e, 0xf97316, 0x2f7bff, 0xdc2626];
+
+/**
+ * Steady base hits only ever rumble the camera up to this trauma (0.15^2 = a 2% shake), however many units land;
+ * big moments (breach, boss stomp, Brute) still shake on top.
+ */
+const RUMBLE_CAP = 0.15;
 
 // Per-frame emission budgets: a 5,000-unit brawl produces thousands of kill events a second; a sample is plenty.
 const KILL_BUDGET = 14;
@@ -78,6 +91,11 @@ export class Effects {
     this.trauma = Math.min(1, this.trauma + amount);
   }
 
+  /** Like shake, but never pushes trauma past RUMBLE_CAP: for continuous, high-rate sources. */
+  rumble(amount: number): void {
+    if (this.trauma < RUMBLE_CAP) this.trauma = Math.min(RUMBLE_CAP, this.trauma + amount);
+  }
+
   update(world: World, gates: GatesRenderer, time: number, dt: number): void {
     const ev = world.events;
     // If we fell more than a ring behind (long stall), skip to the oldest event still in the buffer.
@@ -105,7 +123,7 @@ export class Effects {
         }
         case EV_BASE_HIT:
           if (hits++ < HIT_BUDGET) P.emit(x, 1.5, z + 0.6, 3, hits % 2 ? 0x6b6378 : 0xffd36b, 4, 6, 0.24, 0.7);
-          this.shake(0.012);
+          this.rumble(0.012);
           break;
         case EV_BREACH:
           P.emit(x, 0.6, z, 30, 0xff2a2a, 6, 7, 0.3, 0.9);

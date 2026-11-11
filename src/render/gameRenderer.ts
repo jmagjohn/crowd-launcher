@@ -133,7 +133,7 @@ export class GameRenderer {
     units.update(world.player, world.enemy, alpha, time);
     this.gates!.update(world.gates, world.tick, this.camera, this.width, this.height, time, frameDt);
     this.effects.update(world, this.gates!, time, frameDt);
-    if (this.fortress.update(world.baseHp, world.baseMaxHp, world.state === STATE_WON, time, frameDt)) this.effects.shake(0.02);
+    if (this.fortress.update(world.baseHp, world.baseMaxHp, world.state === STATE_WON, time, frameDt)) this.effects.rumble(0.02);
 
     // Camera shake: offset by trauma^2 noise, then restore the fitted pose.
     const tr = this.shakeOn ? this.effects.trauma : 0;

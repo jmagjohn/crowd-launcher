@@ -38,7 +38,7 @@ export const CAMPAIGN: LevelConfig[] = [
   },
   {
     id: 'c03', name: 'Brute Force', seed: 103, baseHp: 420, fireRate: 8, reward: 40,
-    intro: { title: 'The Brute', text: 'Firing charges your BRUTE. Tap it (or press E) to launch a 40-HP champion that smashes through crowds.' },
+    intro: { title: 'The Brute', text: 'Firing charges your BRUTE. Tap it (or press B) to launch a 40-HP champion that smashes through crowds.' },
     gates: [
       { op: 'mul', value: 2, x: -3, y: 11, width: 4 },
       { op: 'mul', value: 2, x: 3, y: 11, width: 4 },

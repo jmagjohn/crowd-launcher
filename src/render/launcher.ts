@@ -11,7 +11,7 @@ interface Barrel {
 }
 
 /**
- * The player's launcher: a hover turret whose barrels change with the equipped weapon. Barrels recoil and flash on
+ * The player's launcher: a cannon on a stone emplacement whose barrels change with the equipped weapon. Barrels recoil and flash on
  * every shot, a faint aim guide runs up the lane, and a gold ring pulses while the Brute is ready.
  */
 export class Launcher {
@@ -29,14 +29,15 @@ export class Launcher {
 
   constructor(scene: THREE.Scene) {
     this.flashTex = radialTexture();
-    const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.2, 0.35, 16), new THREE.MeshLambertMaterial({ color: 0x24324f }));
+    // A stone emplacement under a bronze cannon.
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.25, 0.38, 8), new THREE.MeshLambertMaterial({ color: 0x8b909c }));
     pad.position.y = 0.18;
     const padRim = new THREE.Mesh(new THREE.TorusGeometry(1.08, 0.08, 6, 24), new THREE.MeshBasicMaterial({ color: 0x5aa2ff }));
     padRim.rotation.x = Math.PI / 2;
     padRim.position.y = 0.36;
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.62, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x2f7bff }));
     body.position.y = 0.36;
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 0.3), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 0.3), new THREE.MeshLambertMaterial({ color: 0xffc933 }));
     stripe.position.set(0, 0.62, 0.35);
     this.turret.add(body, stripe);
     this.group.add(pad, padRim, this.turret);
@@ -65,7 +66,7 @@ export class Launcher {
     this.weapon = weapon;
     for (const b of this.barrels) this.turret.remove(b.pivot);
     this.barrels = [];
-    const steel = new THREE.MeshLambertMaterial({ color: 0xdbe6ff });
+    const steel = new THREE.MeshLambertMaterial({ color: 0xd8b878 });
     const accent = new THREE.MeshLambertMaterial({ color: weapon === W_RUNNER ? 0x35d4ff : 0x1b47c9 });
     const make = (x: number, yaw: number, len: number, r: number): void => {
       const pivot = new THREE.Group();

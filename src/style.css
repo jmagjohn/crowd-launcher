@@ -171,6 +171,9 @@ html, body {
   cursor: pointer;
 }
 .champ span { position: relative; }
+/* Keyboard hint, only where there is a mouse (PC). */
+.champ kbd { display: none; position: absolute; top: 6px; right: 8px; font: 800 11px var(--font); padding: 1px 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.18); color: #fff; }
+@media (hover: hover) and (pointer: fine) { .champ kbd { display: block; } }
 .charge-fill {
   position: absolute;
   inset: 0;

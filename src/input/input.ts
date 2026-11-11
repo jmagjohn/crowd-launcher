@@ -99,6 +99,7 @@ export class InputController {
         this.keyFiring = true;
         e.preventDefault();
         break;
+      case 'KeyB':
       case 'KeyE':
       case 'ShiftLeft':
         this.championQueued = true;

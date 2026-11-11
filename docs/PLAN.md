@@ -9,7 +9,7 @@ src/input/    pointer + keyboard -> SimInput (one code path for mouse and touch)
 src/levels/   level configs (data only), seeded generator 16-50, calibration table
 src/meta/     coins, upgrades, save/load (M2)
 src/ui/       HTML/CSS overlays: HUD, start/win/lose, shop
-src/audio/    procedural WebAudio (M4)
+src/audio/    procedural WebAudio (M5)
 src/debug/    perf overlay, benchmark harness, lil-gui panel (dev only)
 scripts/      bench-sim (headless), bench-browser (CDP-throttled Chrome), balance (winnability + calibration)
 ```
@@ -145,7 +145,11 @@ Dropped: player-calibrated bot bands, re-tuning levels 1-15, economy rework, mob
   and that a seed always produces the same level. No player-simulation bands.
 - Upgrade caps reviewed so 50 stays reachable (max levels may rise if the late curve needs it).
 
-**M4: feel**
+**M4: knights vs orcs art, levels 51-100, endless** (done, see docs/milestones/M4.md)
+- New unit models with a shader walk cycle, orc stronghold, B key for the Brute, capped rumble under heavy fire.
+- Levels 51-100 from the calibrated generator; endless mode after 100.
+
+**M5: feel**
 - Procedural WebAudio (fire, gates, hits, boss stomp, win/lose) with a mute toggle.
 - Juice: slow-mo on big moments, win celebration, camera follow, shake tuning.
 

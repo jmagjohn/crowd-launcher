@@ -14,11 +14,16 @@ import { Screens, type EndSummary } from './ui/screens';
 
 type Mode = 'menu' | 'play' | 'paused' | 'ended';
 
+/** `startLevel` value that opens the stress / benchmark scene. */
+export const STRESS_INDEX = -2;
+
 export interface GameOptions {
+  /** The calibrated campaign; indices past it are endless levels from `levelAt`. */
   levels: readonly LevelConfig[];
+  levelAt: (i: number) => LevelConfig;
   /** Benchmark / sandbox level, reachable with ?level=stress or ?bench. */
   stress: LevelConfig;
-  /** -1 = continue from the save; otherwise a campaign index; levels.length = the stress level. */
+  /** -1 = continue from the save; STRESS_INDEX = the stress level; otherwise a level index. */
   startLevel: number;
   seed?: number;
   perf: boolean;
@@ -98,12 +103,11 @@ export class Game implements PerfSource {
       this.last = 0;
     });
 
-    const continueAt = Math.min(this.progress.save.unlocked, opts.levels.length - 1);
-    this.loadLevel(opts.startLevel >= 0 ? opts.startLevel : continueAt);
+    this.loadLevel(opts.startLevel === -1 ? this.progress.save.unlocked : opts.startLevel);
     if (opts.bench) {
       this.bench = new BenchRecorder(opts.bench.warm, opts.bench.secs);
       this.play();
-    } else if (opts.startLevel >= 0) {
+    } else if (opts.startLevel !== -1) {
       this.showStart();
     } else {
       this.showMenu();
@@ -135,16 +139,17 @@ export class Game implements PerfSource {
   // ---- flow ----
 
   private isStress(i: number): boolean {
-    return i >= this.opts.levels.length;
+    return i === STRESS_INDEX;
   }
 
   private labelFor(i: number): string {
-    return this.isStress(i) ? 'Debug' : `Level ${i + 1}`;
+    if (this.isStress(i)) return 'Debug';
+    return i >= this.opts.levels.length ? `Endless ${i + 1}` : `Level ${i + 1}`;
   }
 
   loadLevel(i: number): void {
     this.levelIndex = i;
-    this.level = this.isStress(i) ? this.opts.stress : this.opts.levels[i];
+    this.level = this.isStress(i) ? this.opts.stress : this.opts.levelAt(i);
     const mods = this.isStress(i) ? NEUTRAL_MODS : this.progress.modsFor(this.level);
     this.world = new World(this.level, mods, this.opts.seed);
     this.renderer.setWorld(this.world);
@@ -182,7 +187,7 @@ export class Game implements PerfSource {
     this.mode = 'menu';
     this.input.enabled = false;
     this.hud.setVisible(false);
-    const next = Math.min(this.progress.save.unlocked, this.opts.levels.length - 1);
+    const next = this.progress.save.unlocked;
     if (next !== this.levelIndex) this.loadLevel(next);
     this.screens.showMenu(
       this.progress.coins,
@@ -208,17 +213,28 @@ export class Game implements PerfSource {
     this.input.enabled = false;
     this.hud.setVisible(false);
     const save = this.progress.save;
+    const n = this.opts.levels.length;
     const tiles = this.opts.levels.map((l, i) => ({
       label: String(i + 1),
       name: l.name,
       locked: i > save.unlocked && !this.opts.debug,
       cleared: (save.levels[l.id]?.wins ?? 0) > 0,
       boss: !!l.boss,
-      current: i === Math.min(save.unlocked, this.opts.levels.length - 1),
+      current: i === save.unlocked,
     }));
+    // Endless: one tile that resumes at the furthest endless level reached.
+    const endlessAt = Math.max(n, save.unlocked);
+    tiles.push({
+      label: '∞',
+      name: save.unlocked > n ? `Endless (best: level ${save.unlocked})` : 'Endless mode',
+      locked: save.unlocked < n && !this.opts.debug,
+      cleared: false,
+      boss: false,
+      current: save.unlocked >= n,
+    });
     if (this.opts.debug) tiles.push({ label: 'S', name: 'Stress test', locked: false, cleared: false, boss: false, current: false });
     this.screens.showLevels(tiles, (i) => {
-      this.loadLevel(i);
+      this.loadLevel(i < n ? i : i === n ? endlessAt : STRESS_INDEX);
       this.showStart();
     }, () => this.showMenu());
   }
@@ -262,7 +278,7 @@ export class Game implements PerfSource {
       hint: won ? null : lossHint(w),
       shopHint: won ? null : this.progress.affordableSuggestion(),
     };
-    const hasNext = !stress && this.levelIndex + 1 < this.opts.levels.length;
+    const hasNext = !stress;
     const next = won && hasNext ? () => { this.loadLevel(this.levelIndex + 1); this.showStart(); } : null;
     this.hud.setVisible(false);
     this.screens.showEnd(summary, () => this.restart(), next, () => this.showShop(() => this.showStart()), () => this.showMenu());
@@ -360,7 +376,7 @@ export function lossHint(w: World): string {
   if (shockShare > 0.15) return 'The boss shockwave wiped out a lot of your army. When the red circle pulses, hold fire or aim away, then push again.';
   if (s.fired > 0 && s.boosted / s.fired < 0.35) return 'Most of your units missed the multiplier gates. Aim through × gates before pushing.';
   if (w.breached) return 'An enemy slipped past your line. Swing over to meet threats before they reach the bottom.';
-  if (w.championEnabled && s.champions === 0) return 'You never launched the Brute. Tap BRUTE (or press E) when it glows to break dense waves.';
+  if (w.championEnabled && s.champions === 0) return 'You never launched the Brute. Tap BRUTE (or press B) when it glows to break dense waves.';
   if (s.gateLost > s.gateGained * 0.5) return 'You lost a lot of units to ÷ and − gates. Route around them, or only pay a toll that guards a big ×.';
   return 'Spread your fire: one gate can flip or run dry if you lean on it too hard.';
 }

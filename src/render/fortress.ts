@@ -1,12 +1,18 @@
 import * as THREE from 'three';
 import { BASE_Y } from '../sim/config';
 import type { Particles } from './particles';
+import { buildParts, type Part } from './visuals';
 
-const STONE = 0x6b6378;
-const STONE_D = 0x4a4456;
-const ROOF = 0xc92a2a;
-const TRIM = 0xe5383b;
-const DOOR = 0x2a0f12;
+const ROCK = 0x6b6378;
+const LOG = 0x9a6638;
+const LOG_D = 0x74482a;
+const TIP = 0xe0c08e;
+const IRON = 0x3d414a;
+const DOOR = 0x3a2414;
+const RED = 0xc0392b;
+const BONE = 0xe8e0c8;
+/** Debris colour for falling chunks. */
+const DEBRIS = LOG;
 
 interface Chunk {
   mesh: THREE.Object3D;
@@ -20,8 +26,8 @@ interface Chunk {
 }
 
 /**
- * The enemy fortress. It visibly crumbles as it takes damage: merlons, roofs and banners are "chunks" that each
- * break off at an HP threshold (with debris), the stone darkens and smokes, and on defeat the whole keep sinks.
+ * The orc stronghold. It visibly crumbles as it takes damage: roofs, banners, skull poles and spikes are "chunks"
+ * that each break off at an HP threshold (with debris), the wood darkens and smokes, and on defeat it all sinks.
  */
 export class Fortress {
   readonly group = new THREE.Group();
@@ -35,48 +41,84 @@ export class Fortress {
   private frac = 1;
 
   constructor(scene: THREE.Scene, private readonly particles: Particles) {
-    const stone = this.mat(STONE);
-    const stoneD = this.mat(STONE_D);
-    const roof = this.mat(ROOF);
-    const trim = this.mat(TRIM);
-    const door = this.mat(DOOR);
     const g = this.group;
 
-    const add = (geom: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, chunkAt = -1): THREE.Mesh => {
+    // Everything that never breaks off is merged into one vertex-coloured mesh (one draw call).
+    const fixed: Part[] = [];
+    const part = (shape: Part['shape'], color: number, x: number, y: number, z: number, rot?: [number, number, number]): void => {
+      fixed.push({ shape, color, pos: [x, y, z], rot });
+    };
+    // Chunks are separate meshes so they can fall.
+    const chunk = (geom: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, at: number): THREE.Mesh => {
       const m = new THREE.Mesh(geom, mat);
       m.position.set(x, y, z);
       g.add(m);
-      if (chunkAt >= 0) this.chunks.push({ mesh: m, at: chunkAt, falling: 0, vy: 0, spin: new THREE.Vector3(), home: m.position.clone(), homeRot: new THREE.Euler() });
+      this.chunks.push({ mesh: m, at, falling: 0, vy: 0, spin: new THREE.Vector3(), home: m.position.clone(), homeRot: new THREE.Euler() });
       return m;
     };
+    const red = this.mat(RED);
+    const iron = this.mat(IRON);
+    const bone = this.mat(BONE);
+    const logMat = this.mat(LOG_D);
 
-    // Curtain wall and gatehouse.
-    add(new THREE.BoxGeometry(12.6, 3.4, 2.2), stone, 0, 1.7, 0);
-    add(new THREE.BoxGeometry(12.8, 0.3, 2.4), stoneD, 0, 3.45, 0);
-    add(new THREE.BoxGeometry(4.4, 5.6, 3.2), stone, 0, 2.8, 0.4);
-    add(new THREE.BoxGeometry(2.6, 2.6, 0.2), door, 0, 1.3, 2.05);
-    add(new THREE.BoxGeometry(3.2, 0.35, 0.3), trim, 0, 2.75, 2.1);
-    const gateRoof = add(new THREE.ConeGeometry(3.4, 2.4, 4), roof, 0, 6.8, 0.4, 0.12);
-    gateRoof.rotation.y = Math.PI / 4;
+    // Rock footing and a log palisade with sharpened tips.
+    part({ s: 'box', w: 13.4, h: 0.9, d: 2.8 }, ROCK, 0, 0.45, 0.2);
+    for (let k = 0; k < 17; k++) {
+      const x = -6.2 + k * 0.775;
+      if (Math.abs(x) < 2.1) continue; // the gate
+      const h = 3.3 + ((k * 37) % 5) * 0.12;
+      part({ s: 'cyl', rt: 0.39, rb: 0.39, h, seg: 6 }, k % 2 ? LOG : LOG_D, x, 0.9 + h / 2, 0.5);
+      part({ s: 'cone', r: 0.39, h: 0.7, seg: 6 }, TIP, x, 0.9 + h + 0.35, 0.5);
+    }
+    // Walkway behind the wall.
+    part({ s: 'box', w: 12.6, h: 0.25, d: 1.4 }, LOG_D, 0, 3.6, -0.6);
 
-    // Merlons along the wall top.
-    const merlon = new THREE.BoxGeometry(0.9, 0.8, 0.7);
-    const xs = [-5.8, -4.6, -3.4, 3.4, 4.6, 5.8];
-    xs.forEach((x, i) => add(merlon, stone, x, 4.0, 0.75, 0.92 - i * 0.13));
-    [-1.6, -0.5, 0.6, 1.7].forEach((x, i) => add(merlon, stone, x, 5.95, 1.7, 0.86 - i * 0.16));
-
-    // Corner towers with roofs.
+    // Gatehouse: two thick towers, an iron-banded gate, a platform and a spiked roof.
     for (const side of [-1, 1]) {
-      add(new THREE.CylinderGeometry(1.35, 1.5, 6.4, 10), stone, side * 6.4, 3.2, 0.3);
-      add(new THREE.CylinderGeometry(1.55, 1.55, 0.35, 10), stoneD, side * 6.4, 6.5, 0.3);
-      add(new THREE.ConeGeometry(1.8, 2.6, 10), roof, side * 6.4, 7.95, 0.3, side < 0 ? 0.4 : 0.25);
-      // Banners.
-      add(new THREE.BoxGeometry(1.0, 2.0, 0.06), trim, side * 2.9, 2.4, 1.15, side < 0 ? 0.55 : 0.33);
+      part({ s: 'cyl', rt: 0.75, rb: 0.85, h: 5.2, seg: 7 }, LOG, side * 1.85, 3.5, 0.7);
+      part({ s: 'box', w: 1.9, h: 0.25, d: 1.9 }, IRON, side * 1.85, 4.1, 0.7);
+    }
+    part({ s: 'box', w: 2.9, h: 3.1, d: 0.35 }, DOOR, 0, 2.45, 1.0);
+    for (const y of [1.5, 2.6, 3.6]) part({ s: 'box', w: 3.0, h: 0.18, d: 0.12 }, IRON, 0, y, 1.2);
+    part({ s: 'box', w: 5.2, h: 0.45, d: 2.6 }, LOG_D, 0, 6.1, 0.6);
+    for (const x of [-2.2, -1.1, 0, 1.1, 2.2]) part({ s: 'cone', r: 0.16, h: 0.8, seg: 4 }, BONE, x, 6.7, 1.75);
+
+    // Corner watchtowers on stilts.
+    for (const side of [-1, 1]) {
+      const tx = side * 6.5;
+      for (const [dx, dz] of [[-0.9, -0.5], [0.9, -0.5], [-0.9, 1.3], [0.9, 1.3]]) {
+        part({ s: 'cyl', rt: 0.16, rb: 0.2, h: 6.2, seg: 5 }, LOG_D, tx + dx, 3.1, 0.4 + dz);
+      }
+      part({ s: 'box', w: 2.6, h: 1.1, d: 2.6 }, LOG, tx, 6.3, 0.8);
+      part({ s: 'box', w: 2.8, h: 0.2, d: 2.8 }, IRON, tx, 6.9, 0.8);
     }
 
+    const merged = new THREE.Mesh(buildParts(fixed), this.mat(0xffffff, true));
+    g.add(merged);
+
+    // Breakable pieces, most fragile first as HP drops.
+    const roof = this.mat(LOG_D);
+    const gateRoof = chunk(new THREE.ConeGeometry(3.3, 2.6, 4), roof, 0, 7.6, 0.6, 0.15);
+    gateRoof.rotation.y = Math.PI / 4;
+    for (const side of [-1, 1]) {
+      chunk(new THREE.ConeGeometry(2.1, 2.4, 4), roof, side * 6.5, 8.2, 0.8, side < 0 ? 0.42 : 0.28).rotation.y = Math.PI / 4;
+      // War banners on the wall: red cloth with a bone stripe.
+      chunk(new THREE.BoxGeometry(1.2, 2.3, 0.08), red, side * 3.7, 2.6, 1.0, side < 0 ? 0.6 : 0.36);
+      chunk(new THREE.BoxGeometry(0.9, 0.18, 0.1), bone, side * 3.7, 2.9, 1.06, side < 0 ? 0.6 : 0.36);
+    }
+    // Skull poles in front of the gate.
+    for (const [x, at] of [[-2.8, 0.9], [2.8, 0.78], [-4.9, 0.66], [4.9, 0.5]] as const) {
+      chunk(new THREE.CylinderGeometry(0.07, 0.09, 2.4, 5), logMat, x, 2.1, 1.9, at);
+      chunk(new THREE.IcosahedronGeometry(0.28, 0), bone, x, 3.4, 1.9, at);
+    }
+    // Iron spikes along the gate platform.
+    for (const [x, at] of [[-2.4, 0.72], [2.4, 0.55]] as const) chunk(new THREE.ConeGeometry(0.2, 1.0, 4), iron, x, 6.8, 0.6, at);
+
     // Flag on the gatehouse.
-    add(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 6), stoneD, 0, 9.2, 0.4);
-    this.flag = add(new THREE.PlaneGeometry(1.6, 0.9, 6, 1).translate(0.8, 0, 0), new THREE.MeshLambertMaterial({ color: TRIM, side: THREE.DoubleSide }), 0.06, 10.0, 0.4);
+    chunk(new THREE.CylinderGeometry(0.06, 0.06, 2.6, 6), logMat, 0, 9.6, 0.6, -1);
+    this.flag = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9, 6, 1).translate(0.8, 0, 0), new THREE.MeshLambertMaterial({ color: RED, side: THREE.DoubleSide }));
+    this.flag.position.set(0.06, 10.4, 0.6);
+    g.add(this.flag);
 
     for (const c of this.chunks) c.homeRot.copy(c.mesh.rotation);
     g.name = 'fortress';
@@ -84,8 +126,8 @@ export class Fortress {
     scene.add(g);
   }
 
-  private mat(color: number): THREE.MeshLambertMaterial {
-    const m = new THREE.MeshLambertMaterial({ color, emissive: 0xff2a2a, emissiveIntensity: 0 });
+  private mat(color: number, vertexColors = false): THREE.MeshLambertMaterial {
+    const m = new THREE.MeshLambertMaterial({ color, vertexColors, emissive: 0xff2a2a, emissiveIntensity: 0 });
     m.userData.base = new THREE.Color(color);
     this.mats.push(m);
     return m;
@@ -132,7 +174,7 @@ export class Fortress {
         c.vy = 2;
         c.spin.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6);
         const p = c.mesh.position;
-        this.particles.emit(wx + p.x, p.y, wz + p.z, 14, STONE, 4, 7, 0.35, 1.2);
+        this.particles.emit(wx + p.x, p.y, wz + p.z, 14, DEBRIS, 4, 7, 0.35, 1.2);
       }
       if (c.falling > 0 && c.mesh.visible) {
         c.vy -= 22 * dt;
@@ -164,7 +206,7 @@ export class Fortress {
 
     if (won) {
       if (this.collapse === 0) {
-        for (let k = 0; k < 6; k++) this.particles.emit(wx + (k - 2.5) * 2, 2 + Math.random() * 3, wz + 1, 16, k % 2 ? STONE : 0x9a90a8, 6, 9, 0.5, 1.6);
+        for (let k = 0; k < 6; k++) this.particles.emit(wx + (k - 2.5) * 2, 2 + Math.random() * 3, wz + 1, 16, k % 2 ? LOG : TIP, 6, 9, 0.5, 1.6);
         this.particles.emit(wx, 3, wz + 1, 30, 0xff8a1f, 5, 8, 0.4, 0.9);
       }
       this.collapse = Math.min(1, this.collapse + dt * 0.7);

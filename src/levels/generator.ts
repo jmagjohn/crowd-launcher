@@ -18,7 +18,23 @@ import { TUNE } from './tuning';
  * player's ceiling rises with the enemy's.
  */
 export const FIRST_GENERATED = 16;
-export const LAST_LEVEL = 50;
+/** Last calibrated campaign level. Beyond it is endless mode (see endlessTune). */
+export const LAST_LEVEL = 100;
+/** `late` runs 0..1 over levels 15-50 and keeps climbing after; values past LATE_CAP stop changing gate speeds etc. */
+const LATE_SPAN = 35;
+const LATE_CAP = 1.6;
+/**
+ * Endless mode. Levels up to ENDLESS_CALIBRATED are calibrated against maxed upgrades, with the margin climbing
+ * ENDLESS_RAMP of the bot's ceiling per level (past 100% from about level 110: how far you get is the score).
+ * Past that, strength and base extrapolate at ENDLESS_GROWTH per level.
+ */
+export const ENDLESS_CALIBRATED = 160;
+export const ENDLESS_RAMP = 0.02;
+export const ENDLESS_GROWTH = 1.03;
+
+function lateness(n: number): number {
+  return (n - 15) / LATE_SPAN;
+}
 
 /** Tuned with `npm run balance` (scripts/balance.ts). */
 export const GEN = {
@@ -47,13 +63,14 @@ export function difficulty(n: number): number {
 
 /** Fraction of the calibrated ceiling a level is set at: ~0.5 at 16, up to 0.82 in the 40s; sawtooth on top. */
 export function targetMargin(n: number): number {
-  const late = (n - 15) / (LAST_LEVEL - 15);
-  return Math.min(0.82, Math.max(0.35, (0.5 + 0.25 * late) * pacing(n)));
+  const late = lateness(n);
+  const endless = n > LAST_LEVEL ? ENDLESS_RAMP * (n - LAST_LEVEL) : 0;
+  return Math.min(0.82, Math.max(0.35, (0.5 + 0.25 * late) * pacing(n))) + endless;
 }
 
-/** Target length of a level for a strong, upgraded player: 30 s at level 16, 55 s at 50 (bosses +10 s). */
+/** Target length of a level for a strong, upgraded player: 30 s at level 16, 55 s at 50, 60 s from 57 (bosses +10 s). */
 export function levelDuration(n: number): number {
-  const late = (n - 15) / (LAST_LEVEL - 15);
+  const late = Math.min(lateness(n), 1.2);
   return 30 + 25 * late + (isBossLevel(n) ? 10 : 0);
 }
 
@@ -63,13 +80,28 @@ export function isBossLevel(n: number): boolean {
 
 const ADJ = ['Iron', 'Ember', 'Frost', 'Hollow', 'Crimson', 'Ashen', 'Storm', 'Bone', 'Thorn', 'Gilded', 'Shadow', 'Broken', 'Sunken', 'Howling'];
 const NOUN = ['Pass', 'Gate', 'Bridge', 'Keep', 'Road', 'March', 'Hold', 'Rampart', 'Ford', 'Crossing', 'Watch', 'Spire', 'Causeway', 'Breach'];
-const BOSS_NAMES: Record<number, string> = { 20: "Warden's Return", 30: 'The Tyrant', 40: 'Twin Wardens', 50: 'Last Stand' };
+const BOSS_NAMES: Record<number, string> = {
+  20: "Warden's Return",
+  30: 'The Tyrant',
+  40: 'Twin Wardens',
+  50: 'Last Stand',
+  60: "Warlord's Pact",
+  70: 'Twin Kings',
+  80: 'War Council',
+  90: 'The Horde',
+  100: 'Final Siege',
+};
 
 const INTROS: Record<number, LevelConfig['intro']> = {
   16: { title: 'Ogres', text: 'Ogres take 12 hits each and plod forward. A thin stream just feeds them; multiply hard before you meet one.' },
   25: { title: 'Escorted', text: 'From here on, Wardens can lead ordinary waves. Expect stomps on any level.' },
   30: { title: 'Boss: the Tyrant', text: 'The Tyrant stomps like a Warden, and every stomp calls up a pack of grunts. Kill it fast or drown.' },
   40: { title: 'Two at once', text: 'Two Wardens, staggered stomps. Upgrades are not optional any more.' },
+  51: { title: 'Beyond the wall', text: 'The war goes on. Five gate rows from level 60, faster gates, and bigger hordes.' },
+  70: { title: 'Two kings', text: 'Two Tyrants, two summoning stomps. Thin their escorts before they swarm you.' },
+  75: { title: 'Royal escort', text: 'From here, Tyrants lead ordinary waves too.' },
+  100: { title: 'Final Siege', text: 'Every boss they have left. Win this and the endless war begins.' },
+  101: { title: 'Endless', text: 'The war never ends. Each level pushes a little harder than the last, and sooner or later the horde wins. How far can you go?' },
 };
 
 type RowKind = 'pair' | 'toll' | 'plus' | 'div' | 'flip' | 'move' | 'limited';
@@ -78,16 +110,19 @@ type RowKind = 'pair' | 'toll' | 'plus' | 'div' | 'flip' | 'move' | 'limited';
 const ROW_KINDS: readonly RowKind[] = ['pair', 'toll', 'plus', 'div', 'flip', 'move', 'limited'];
 
 /** `k` scales the enemy waves and bosses; `baseHp` overrides the base (both default to the calibration table). */
-export function generateLevel(n: number, k = TUNE[n]?.k ?? 1, baseHp = TUNE[n]?.base): LevelConfig {
-  if (n < FIRST_GENERATED || n > LAST_LEVEL) throw new Error(`generateLevel: level ${n} is out of range`);
+export function generateLevel(n: number, k = TUNE[n]?.k ?? endlessTune(n).k, baseHp = TUNE[n]?.base ?? endlessTune(n).base): LevelConfig {
+  if (n < FIRST_GENERATED) throw new Error(`generateLevel: level ${n} is handcrafted`);
   const seed = 0x5eed + n * 7919;
   const rng = new Rng(seed);
   const D = difficulty(n);
   const K = D * k;
-  const late = (n - 15) / (LAST_LEVEL - 15); // 0..1 across the generated range
+  const late = Math.min(lateness(n), LATE_CAP); // 0..1 over 16-50, capped later
   const boss = isBossLevel(n);
 
-  const gates = buildGates(n, rng, D, late);
+  // Gate values (tolls, + gates, flip thresholds) track D through the campaign. In endless D keeps compounding while
+  // k holds the enemy flat, so gates grow ENDLESS_GROWTH a level from level 100 instead.
+  const gateD = n > LAST_LEVEL ? (pacing(n) / pacing(LAST_LEVEL)) * difficulty(LAST_LEVEL) * Math.pow(ENDLESS_GROWTH, n - LAST_LEVEL) : D;
+  const gates = buildGates(n, rng, gateD, late);
   const waves = buildWaves(n, rng, K, late);
 
   const name = BOSS_NAMES[n] ?? `${ADJ[rng.int(ADJ.length)]} ${NOUN[rng.int(NOUN.length)]}`;
@@ -109,7 +144,7 @@ export function generateLevel(n: number, k = TUNE[n]?.k ?? 1, baseHp = TUNE[n]?.
 // ---- gates ----
 
 function buildGates(n: number, rng: Rng, D: number, late: number): GateConfig[] {
-  const rowsY = n < 25 ? [8, 16, 24] : [7, 13.5, 20, 26.5];
+  const rowsY = n < 25 ? [8, 16, 24] : n < 60 ? [7, 13.5, 20, 26.5] : [6.5, 12, 17.5, 23, 28.5];
   const narrow = Math.max(2.2, 3 - 0.8 * late);
   const out: GateConfig[] = [];
   let prev: RowKind | null = null;
@@ -195,7 +230,37 @@ function buildWaves(n: number, rng: Rng, K: number, late: number): WaveConfig[] 
     out.push({ t: 2, type: 'tyrant', count: 1, hp: bossHp(GEN.tyrantHp0 * 0.8) });
     out.push({ t: 14, type: 'boss', count: 1, x: rng.range(-2, 2), hp: bossHp(GEN.bossHp0 * 0.6) });
   }
-  if (!bossLevel && n >= 25 && n % 10 === 5) out.push({ t: 10, type: 'boss', count: 1, x: rng.range(-2, 2), hp: bossHp(GEN.bossHp0 * 0.5) });
+  // 60-100: every boss level stacks more of them.
+  if (n === 60) {
+    out.push({ t: 2, type: 'tyrant', count: 1, hp: bossHp(GEN.tyrantHp0 * 0.7) });
+    out.push({ t: 9, type: 'boss', count: 1, x: -2.5, hp: bossHp(GEN.bossHp0 * 0.5) });
+  }
+  if (n === 70) {
+    out.push({ t: 2, type: 'tyrant', count: 1, x: -2.5, hp: bossHp(GEN.tyrantHp0 * 0.55) });
+    out.push({ t: 6, type: 'tyrant', count: 1, x: 2.5, hp: bossHp(GEN.tyrantHp0 * 0.55) });
+  }
+  if (n === 80) {
+    for (const [t, x] of [[2, 0], [6, -3], [10, 3]]) out.push({ t, type: 'boss', count: 1, x, hp: bossHp(GEN.bossHp0 * 0.45) });
+  }
+  if (n === 90) {
+    out.push({ t: 2, type: 'tyrant', count: 1, hp: bossHp(GEN.tyrantHp0 * 0.6) });
+    for (const [t, x] of [[8, -3], [14, 3]]) out.push({ t, type: 'boss', count: 1, x, hp: bossHp(GEN.bossHp0 * 0.4) });
+  }
+  if (n === 100) {
+    for (const [t, x] of [[2, -2.5], [7, 2.5]]) out.push({ t, type: 'tyrant', count: 1, x, hp: bossHp(GEN.tyrantHp0 * 0.45) });
+    for (const [t, x] of [[12, -3], [16, 3]]) out.push({ t, type: 'boss', count: 1, x, hp: bossHp(GEN.bossHp0 * 0.35) });
+  }
+  // Endless boss levels cycle through the 60-100 line-ups' simplest form: a Tyrant and a Warden.
+  if (n > LAST_LEVEL && bossLevel) {
+    out.push({ t: 2, type: 'tyrant', count: 1, hp: bossHp(GEN.tyrantHp0 * 0.6) });
+    out.push({ t: 10, type: 'boss', count: 1, x: rng.range(-2, 2), hp: bossHp(GEN.bossHp0 * 0.5) });
+  }
+  // Escorts on levels ending in 5: a Warden from 25, a Tyrant from 75.
+  if (!bossLevel && n >= 25 && n % 10 === 5) {
+    const x = rng.range(-2, 2);
+    if (n >= 75) out.push({ t: 10, type: 'tyrant', count: 1, x, hp: bossHp(GEN.tyrantHp0 * 0.4) });
+    else out.push({ t: 10, type: 'boss', count: 1, x, hp: bossHp(GEN.bossHp0 * 0.5) });
+  }
 
   // Crowd waves: more of them, and heavier types, as levels climb.
   const nWaves = 4 + Math.round(2 * late);
@@ -249,4 +314,31 @@ function pickWeighted(rng: Rng, keys: readonly EnemyKey[], w: Record<EnemyKey, n
     if (r <= 0) return k;
   }
   return keys[keys.length - 1];
+}
+
+/**
+ * Stand-in for levels past the calibration table. Upgrades are maxed by then, so calibrated strength levels off:
+ * take the average unpaced strength and base of the last calibrated block of ten (minus its boss level), centred
+ * on its middle level, and grow both ENDLESS_GROWTH per level from there, keeping the usual sawtooth pacing.
+ */
+export function endlessTune(n: number): { k: number; base: number } {
+  let logS = 0;
+  let logBase = 0;
+  let sumM = 0;
+  let count = 0;
+  const last = Math.floor(Math.max(LAST_LEVEL, ...Object.keys(TUNE).map(Number)) / 10) * 10;
+  for (let m = last - 9; m < last; m++) {
+    const t = TUNE[m];
+    if (!t) continue;
+    logS += Math.log(t.k * Math.pow(GEN.growth, m - 15)); // strength without pacing
+    logBase += Math.log(t.base / pacing(m));
+    sumM += m;
+    count++;
+  }
+  if (count === 0) return { k: 1, base: Math.round((GEN.baseHp0 * difficulty(n)) / 10) * 10 };
+  const grow = Math.pow(ENDLESS_GROWTH, n - sumM / count);
+  // K = D(n) * k must equal pacing(n) * S * grow, and D(n) = pacing(n) * GEN.growth^(n-15).
+  const k = (Math.exp(logS / count) * grow) / Math.pow(GEN.growth, n - 15);
+  const base = Math.round((Math.exp(logBase / count) * pacing(n) * grow) / 10) * 10;
+  return { k, base };
 }
